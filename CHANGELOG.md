@@ -6,6 +6,14 @@ All notable changes to TuxDrive are documented here. Versions follow
 
 ## 0.1.3
 
+- Fix `tuxdrive-indicator`'s "Open folder" menu item being hardcoded to
+  `~/GoogleDrive`, which was never the actual sync folder name/location —
+  now asks the daemon for the real (possibly user-changed) path.
+- Clarify `install.sh`'s AppIndicator-extension warning: GNOME Shell only
+  discovers a newly-installed system extension after a restart (log out/in
+  on Wayland), so `gnome-extensions enable` failing right after install is
+  expected, not a bug — the warning now says so and gives the exact command
+  to re-run afterward.
 - `install.sh` now auto-installs Flutter via snap when it's missing, instead
   of just skipping the GUI build with a warning — reported after a fresh
   Fedora install produced a working daemon but no GUI, icon, or app-menu

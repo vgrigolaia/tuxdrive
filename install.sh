@@ -332,10 +332,19 @@ loginctl enable-linger "$(id -un)" 2>/dev/null && \
     info "Lingering enabled — daemon starts at boot." || \
     warn "Could not enable linger (non-fatal)."
 
-# Enable GNOME AppIndicator extension
-gnome-extensions enable appindicatorsupport@rgcjonas.gmail.com 2>/dev/null && \
-    info "AppIndicator GNOME extension enabled." || \
-    warn "Enable manually: Extensions app → AppIndicator and KStatusNotifierItem Support"
+# Enable GNOME AppIndicator extension — this commonly fails on a first
+# install even though the package installed fine, because GNOME Shell only
+# discovers newly-dropped-in system extensions after a restart (X11: Alt+F2,
+# r, Enter; Wayland: full log out/in — Shell can't restart in place there).
+# `gnome-extensions enable` before that point reports "no such extension"
+# even though the files are on disk.
+if gnome-extensions enable appindicatorsupport@rgcjonas.gmail.com 2>/dev/null; then
+    info "AppIndicator GNOME extension enabled."
+else
+    warn "Could not enable the AppIndicator GNOME extension yet — this is expected on a first install."
+    warn "Log out and back in, then run: gnome-extensions enable appindicatorsupport@rgcjonas.gmail.com"
+    warn "(or: Extensions app → AppIndicator and KStatusNotifierItem Support → toggle on)"
+fi
 
 # Nautilus sidebar bookmark
 grep -q "TuxDrive" "${HOME}/.config/gtk-3.0/bookmarks" 2>/dev/null || \

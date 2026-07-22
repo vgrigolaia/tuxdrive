@@ -33,7 +33,6 @@ from gi.repository import Gtk, GLib
 exec(f"from gi.repository import {INDICATOR_MODULE} as AppIndicator3")
 
 SOCK = os.path.expanduser("~/.local/share/tuxdrive/daemon.sock")
-DRIVE_DIR = os.path.expanduser("~/GoogleDrive")
 APP_BIN = "/opt/tuxdrive/tuxdrive_flutter"
 
 
@@ -113,7 +112,7 @@ class TuxDriveIndicator:
             open_app_item.connect("activate", self._open_app)
             menu.append(open_app_item)
 
-        open_item = Gtk.MenuItem(label="Open GoogleDrive folder")
+        open_item = Gtk.MenuItem(label="Open TuxDrive folder")
         open_item.connect("activate", self._open_folder)
         menu.append(open_item)
 
@@ -163,8 +162,10 @@ class TuxDriveIndicator:
         return True  # keep the GLib timer running
 
     def _open_folder(self, _):
-        os.makedirs(DRIVE_DIR, exist_ok=True)
-        os.system(f"xdg-open '{DRIVE_DIR}'")
+        r = ipc({"cmd": "get_sync_settings"})
+        drive_dir = (r or {}).get("local_root") or os.path.expanduser("~/TuxDrive")
+        os.makedirs(drive_dir, exist_ok=True)
+        os.system(f"xdg-open '{drive_dir}'")
 
     def _open_app(self, _):
         os.system(f"nohup '{APP_BIN}' >/dev/null 2>&1 &")

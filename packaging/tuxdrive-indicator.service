@@ -1,0 +1,13 @@
+[Unit]
+Description=TuxDrive sync tray indicator
+After=graphical-session.target tuxdrive.service
+
+[Service]
+ExecStart=/usr/bin/tuxdrive-indicator
+Restart=on-failure
+RestartSec=5s
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=graphical-session.target

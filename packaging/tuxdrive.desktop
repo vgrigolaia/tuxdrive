@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=TuxDrive
+Comment=Google Drive sync for Linux
+Exec=/opt/tuxdrive/tuxdrive_flutter
+Icon=tuxdrive
+Terminal=false
+Categories=Utility;Network;
+StartupWMClass=tuxdrive_flutter

@@ -1,0 +1,18 @@
+[Unit]
+Description=TuxDrive Google Drive Sync Daemon
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/tuxdrive-daemon
+Restart=on-failure
+RestartSec=5s
+RestartPreventExitStatus=2
+Environment=RUST_LOG=info
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=tuxdrive
+
+[Install]
+WantedBy=default.target

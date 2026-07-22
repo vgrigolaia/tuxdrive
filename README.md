@@ -37,6 +37,26 @@ To remove everything TuxDrive installed (your synced files in `~/TuxDrive` are l
 ./install.sh --uninstall
 ```
 
+### Alternative: .deb / .rpm package
+
+Prefer your package manager over a build-and-install script? Grab the latest `.deb` or `.rpm` from [GitHub Releases](https://github.com/vgrigolaia/tuxdrive/releases) and install it directly:
+
+```bash
+# Debian/Ubuntu
+sudo dpkg -i tuxdrive_<version>_amd64.deb
+
+# Fedora/RHEL
+sudo rpm -i tuxdrive-<version>-1.x86_64.rpm
+```
+
+Then, per user who wants to sync:
+
+```bash
+systemctl --user enable --now tuxdrive tuxdrive-indicator
+```
+
+and open TuxDrive from the applications menu. These packages are built by [`packaging/build-packages.sh`](packaging/build-packages.sh) — see that script if you want to build one yourself instead of downloading a release.
+
 ### Build from source manually (for development)
 
 ```bash
@@ -106,11 +126,27 @@ cargo fmt --check
 cargo clippy --workspace -- -D warnings
 ```
 
+### Releasing a new version
+
+```bash
+./scripts/bump-version.sh 0.1.4   # syncs Cargo.toml, pubspec.yaml, lib/version.dart
+# add an entry to CHANGELOG.md
+git commit -am "Release 0.1.4"
+git tag v0.1.4
+git push && git push --tags
+```
+
+Pushing the tag triggers [`.github/workflows/release.yml`](.github/workflows/release.yml), which builds and attaches `.deb`/`.rpm` packages to a new GitHub Release automatically.
+
 ## Roadmap
 
 - **Phase 1 (current):** bidirectional folder sync, OAuth2, SQLite, inotify, JSON IPC, Flutter GUI
 - **Phase 2:** selective sync (choose which Drive folders to mirror), shared drives, gRPC IPC, SQLCipher, bandwidth throttling, certificate pinning
 - **Phase 3:** FUSE virtual filesystem with on-demand file download (Files On Demand)
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 

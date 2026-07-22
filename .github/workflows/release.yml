@@ -1,0 +1,51 @@
+name: Release
+
+# Builds .deb and .rpm packages and attaches them to a GitHub Release
+# whenever a version tag is pushed (see scripts/bump-version.sh and
+# `git tag vX.Y.Z`). Uses the bundled default OAuth credentials
+# (packaging/default-credentials.sh) unless TUXDRIVE_CLIENT_ID/
+# TUXDRIVE_CLIENT_SECRET repo secrets are set.
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            rpm libssl-dev pkg-config libsecret-1-dev \
+            clang cmake ninja-build libgtk-3-dev
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Build .deb and .rpm packages
+        env:
+          TUXDRIVE_CLIENT_ID: ${{ secrets.TUXDRIVE_CLIENT_ID }}
+          TUXDRIVE_CLIENT_SECRET: ${{ secrets.TUXDRIVE_CLIENT_SECRET }}
+        run: ./packaging/build-packages.sh all
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            dist/*.deb dist/*.rpm \
+            --title "TuxDrive ${{ github.ref_name }}" \
+            --generate-notes

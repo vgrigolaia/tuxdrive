@@ -3,6 +3,9 @@ target/
 **/*.rs.bk
 Cargo.lock
 
+# Packaging build output (packaging/build-packages.sh)
+dist/
+
 # Flutter
 frontend/flutter/.dart_tool/
 frontend/flutter/.flutter-plugins

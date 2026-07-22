@@ -101,14 +101,20 @@ step "1 / 5  System packages"
 info "Detected package manager: ${PKG_FAMILY}"
 
 # Core packages — required on every distro, names mapped per family.
+# A C compiler/linker is required unconditionally: several Rust crates in
+# this workspace (openssl-sys, libsqlite3-sys, ...) compile small C shims via
+# build scripts, which fails with "linker `cc` not found" on a genuinely
+# fresh machine that has never had a C toolchain installed.
 CORE_PKGS=()
 case "$PKG_FAMILY" in
     debian)
+        command -v cc &>/dev/null   || pkg_installed build-essential || CORE_PKGS+=(build-essential)
         pkg_installed libssl-dev      || CORE_PKGS+=(libssl-dev)
         pkg_installed pkg-config      || CORE_PKGS+=(pkg-config)
         pkg_installed libsecret-1-dev || CORE_PKGS+=(libsecret-1-dev)
         ;;
     fedora)
+        command -v cc &>/dev/null   || pkg_installed gcc || CORE_PKGS+=(gcc)
         pkg_installed openssl-devel      || CORE_PKGS+=(openssl-devel)
         pkg_installed pkgconf-pkg-config || CORE_PKGS+=(pkgconf-pkg-config)
         pkg_installed libsecret-devel    || CORE_PKGS+=(libsecret-devel)
@@ -140,27 +146,35 @@ fi
 # Shell extension often isn't in the default repos (may need a COPR, or
 # RHEL/CentOS may need EPEL enabled first). The daemon and CLI work fine
 # without the tray icon if this step fails.
-TRAY_PKGS=()
 case "$PKG_FAMILY" in
     debian)
+        TRAY_PKGS=()
         pkg_installed gir1.2-ayatanaappindicator3-0.1 || \
           pkg_installed gir1.2-appindicator3-0.1 || \
           TRAY_PKGS+=(gir1.2-ayatanaappindicator3-0.1)
         pkg_installed gnome-shell-extension-appindicator || \
           TRAY_PKGS+=(gnome-shell-extension-appindicator)
+        if [[ ${#TRAY_PKGS[@]} -gt 0 ]]; then
+            pkg_install_all "${TRAY_PKGS[@]}" || \
+                warn "Could not install tray-icon packages (${TRAY_PKGS[*]}) — TuxDrive will still work, just without a system-tray icon."
+        fi
         ;;
     fedora)
-        pkg_installed libayatana-appindicator3-gtk3-devel || \
-          TRAY_PKGS+=(libayatana-appindicator3-gtk3-devel)
+        # The devel package's name varies by Fedora/RHEL release and which
+        # fork is packaged — try the actively-maintained Ayatana fork, then
+        # the older libappindicator, rather than guessing one name and
+        # failing outright if that release uses the other.
+        if ! pkg_installed libayatana-appindicator-gtk3-devel && \
+           ! pkg_installed libappindicator-gtk3-devel; then
+            sudo dnf install -y libayatana-appindicator-gtk3-devel &>/dev/null || \
+              sudo dnf install -y libappindicator-gtk3-devel &>/dev/null || \
+              warn "Could not install an AppIndicator devel package (tried libayatana-appindicator-gtk3-devel, libappindicator-gtk3-devel) — TuxDrive will still work, just without a system-tray icon."
+        fi
         pkg_installed gnome-shell-extension-appindicator || \
-          TRAY_PKGS+=(gnome-shell-extension-appindicator)
+          sudo dnf install -y gnome-shell-extension-appindicator &>/dev/null || \
+          warn "Could not install gnome-shell-extension-appindicator — this may need a COPR repo (or EPEL, on RHEL/CentOS) enabled first. TuxDrive will still work, just without a system-tray icon."
         ;;
 esac
-
-if [[ ${#TRAY_PKGS[@]} -gt 0 ]]; then
-    pkg_install_all "${TRAY_PKGS[@]}" || \
-        warn "Could not install tray-icon packages (${TRAY_PKGS[*]}) — TuxDrive will still work, just without a system-tray icon. On Fedora/RHEL this may need a COPR repo (or EPEL, on RHEL/CentOS) for the GNOME Shell AppIndicator extension."
-fi
 
 # ── Step 2: Rust toolchain ───────────────────────────────────────────────────
 step "2 / 5  Rust toolchain"

@@ -13,6 +13,8 @@ quick personal-use shortcuts. Installer support spans both Debian/Ubuntu
 (apt) and Fedora/RHEL (dnf) families — see the Fedora/RHEL section under
 `install.sh` below.
 
+**Current state:** hosted at [github.com/vgrigolaia/tuxdrive](https://github.com/vgrigolaia/tuxdrive) (public), latest release `v0.1.4`. The bundled Google OAuth client (`packaging/default-credentials.sh`) is still in **Testing** publishing status in Google Cloud Console — only accounts manually added as test users can complete login; every other account hits Google's "Access blocked / unverified app" screen. This is a Google-side gate enforced server-side, not something fixable in this codebase. Getting to "anyone can sign in with zero setup" requires completing Google's OAuth verification review (privacy policy + homepage on tuxdrive.com, scope justification, likely a CASA security assessment since the `drive` scope is restricted) — not started as of `v0.1.4`. Until then, the interim options are: (1) the project owner adds real testers' emails as test users in Cloud Console, or (2) a user points the app at their own OAuth client via the GUI's "Advanced" login option / `config.toml`'s `[auth]` section (`SetAuthConfig` IPC command) — see Auth flow below.
+
 ## Build Commands
 
 ```bash
@@ -61,6 +63,10 @@ flutter analyze   # lint
 ```
 
 `cargo check`/`clippy` on `tuxdrive-daemon` fails without `TUXDRIVE_CLIENT_ID`/`TUXDRIVE_CLIENT_SECRET` set (the `env!()` macro is a compile-time hard requirement, not a runtime default) — the other six workspace crates check fine without them.
+
+## Git workflow
+
+Active work happens on `dev`; `main` tracks releases. Merge `dev` → `main` (fast-forward, no PR needed — solo repo) only when the user asks for it, then tag (`git tag vX.Y.Z && git push origin vX.Y.Z`) to trigger `.github/workflows/release.yml`. Commits in this repo deliberately **do not** get a `Co-Authored-By: Claude` trailer — the user explicitly asked for this to not show up as an AI-authored/co-authored repo; this overrides the usual default commit-message convention for this repo specifically. GitHub's Contributors graph links a commit to a profile by matching the commit author *email* against that profile's **verified** emails — it doesn't matter what the author *name* string says, and no history rewrite is needed once the email is verified (GitHub re-attributes existing commits retroactively).
 
 ### `install.sh`
 
@@ -120,7 +126,7 @@ These have no raw binary content — `alt=media` downloads always 403 with "Use 
 
 The daemon listens on a Unix domain socket (`~/.local/share/tuxdrive/daemon.sock`, permissions 0600). The protocol is **newline-delimited JSON**: one JSON object per line in each direction, FIFO-paired request/response.
 
-Commands (client → daemon, see `IpcCommand` in `backend/daemon/src/ipc.rs`): `get_status`, `pause`, `resume`, `logout`, `list_files`, `get_logs`, `shutdown`, plus the GUI-driven login flow — `start_login` (returns the browser URL immediately), `get_login_status` (poll target; phases: idle → awaiting_browser → exchanging_code → conflict_pending → resolving_conflict → complete/failed), `resolve_sync_conflict` (answers a pending conflict from the safety net above), `cancel_login`. `DaemonState` holds the in-flight `login_state`/`pending_conflict`/`login_task` for this flow. Responses are tagged with `"type"`.
+Commands (client → daemon, see `IpcCommand` in `backend/daemon/src/ipc.rs`): `get_status`, `pause`, `resume`, `logout`, `list_files`, `get_logs`, `shutdown`, `get_sync_settings`/`set_sync_folder` (relocates the sync root, persists to `config.toml`, restarts the daemon), `get_auth_config`/`set_auth_config` (advanced/self-host OAuth client override — same persist-then-restart pattern as `set_sync_folder`; client_secret is never sent back over IPC for display), plus the GUI-driven login flow — `start_login` (returns the browser URL immediately), `get_login_status` (poll target; phases: idle → awaiting_browser → exchanging_code → conflict_pending → resolving_conflict → complete/failed), `resolve_sync_conflict` (answers a pending conflict from the safety net above), `cancel_login`. `DaemonState` holds the in-flight `login_state`/`pending_conflict`/`login_task` for this flow. Responses are tagged with `"type"`.
 
 Full gRPC (tonic + prost from `shared/proto/tuxdrive.proto`) is planned for Phase 2. The `tonic`/`prost` deps are in `Cargo.toml` but the daemon currently uses only the Unix socket.
 
@@ -165,6 +171,10 @@ All subsystems are wrapped in `Arc<T>` and constructed in `run_daemon()` in `bac
 ### Flutter frontend
 
 Located at `frontend/flutter/`. `DaemonClient` (`lib/ipc/daemon_client.dart`) connects to the daemon socket, sends JSON commands, and pairs responses to `Completer` objects via a FIFO queue — decode the stream with `utf8.decoder.bind(_socket!)`, not `_socket!.transform(utf8.decoder)` (the latter doesn't compile under current Dart's stream generic variance). `SyncProvider` (`lib/providers/sync_provider.dart`) polls `get_status` every 3 s and reconnects automatically, plus runs a separate 1 s poll of `get_login_status` while a login is in flight. `LoginScreen` (`lib/screens/login_screen.dart`) drives the entire OAuth + sync-conflict flow from the GUI with zero terminal interaction, switching on `sync.loginPhase`; the app routes there when the daemon is unreachable or no account is logged in, and to `MainScreen` otherwise.
+
+### Tray indicator
+
+`scripts/tuxdrive-indicator` (Python, GTK3 + AppIndicator3/AyatanaAppIndicator3 via GI) polls `get_status` over the same JSON IPC socket every 3 s and queries `get_sync_settings` fresh on each "Open folder" click rather than caching it, so it stays correct if the user relocates the sync folder while the indicator is running. GNOME Shell's tray-icon support for AppIndicator apps is not built in — it needs the `appindicatorsupport@rgcjonas.gmail.com` shell extension both installed *and* enabled, and a freshly-installed system extension isn't visible to a running Shell process until it restarts (X11: Alt+F2, r; Wayland: full log out/in). `install.sh` installs the extension package and attempts `gnome-extensions enable` automatically, but that attempt frequently fails on a first install for exactly this reason — expected, not a bug — hence the warning telling the user to log back in and re-run the enable command themselves.
 
 ## Phase roadmap
 

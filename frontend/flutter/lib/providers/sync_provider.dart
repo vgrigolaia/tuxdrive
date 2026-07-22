@@ -16,6 +16,7 @@ class SyncProvider extends ChangeNotifier {
   List<String> _logs = [];
   LoginStatus _loginStatus = LoginStatus.idle;
   String? _syncFolder;
+  AuthConfigInfo _authConfig = AuthConfigInfo.unknown;
 
   SyncProvider(this._client);
 
@@ -42,6 +43,7 @@ class SyncProvider extends ChangeNotifier {
   int? get loginResolvedTotal => _loginStatus.resolvedTotal;
   String? get loginError => _loginStatus.error;
   String? get syncFolder => _syncFolder;
+  AuthConfigInfo get authConfig => _authConfig;
 
   // ---------------------------------------------------------------------------
   // Connection management
@@ -59,6 +61,7 @@ class SyncProvider extends ChangeNotifier {
     if (_isConnected) {
       await _refresh();
       await loadSyncFolder();
+      await loadAuthConfig();
       _startPolling();
     } else {
       notifyListeners();
@@ -199,6 +202,25 @@ class SyncProvider extends ChangeNotifier {
       return result.error ?? 'Unknown error';
     }
     _syncFolder = result.localRoot;
+    notifyListeners();
+    return null;
+  }
+
+  Future<void> loadAuthConfig() async {
+    _authConfig = await _client.getAuthConfig();
+    notifyListeners();
+  }
+
+  /// Set (or, if both are empty, clear) a custom OAuth client_id/secret.
+  /// Returns an error message on failure, or `null` on success — on success
+  /// the daemon restarts itself to apply the change, which briefly
+  /// disconnects this client; the normal polling loop reconnects it.
+  Future<String?> changeAuthConfig(String clientId, String clientSecret) async {
+    final result = await _client.setAuthConfig(clientId, clientSecret);
+    if (!result.success) {
+      return result.error ?? 'Unknown error';
+    }
+    _authConfig = AuthConfigInfo(clientId: result.clientId, isCustom: result.isCustom);
     notifyListeners();
     return null;
   }

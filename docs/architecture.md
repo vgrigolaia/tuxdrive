@@ -2,7 +2,7 @@
 
 ## Overview
 
-TuxDrive is a production-grade Google Drive desktop synchronization daemon for Linux, modelled after Microsoft OneDrive on Windows. It provides automatic, bidirectional synchronization between a local folder and the user's Google Drive, with a native GTK/Flutter GUI, system-tray integration, and a Phase 3 FUSE virtual filesystem for on-demand file access.
+TuxDrive is a production-grade Google Drive desktop synchronization daemon for Linux, modelled after Microsoft OneDrive on Windows. It provides automatic, bidirectional synchronization between a local folder and the user's Google Drive, with a native GTK/Flutter GUI and system-tray integration. A FUSE virtual filesystem for on-demand file access is planned for Phase 3 (not yet built) — see [Phased Delivery Plan](#phased-delivery-plan) below.
 
 ---
 
@@ -15,7 +15,7 @@ TuxDrive is a production-grade Google Drive desktop synchronization daemon for L
 │  │  Setup Wizard │  │  Main Window   │  │  System Tray Icon │    │
 │  │  OAuth2 Login │  │  File Explorer │  │  Pause / Resume   │    │
 │  └──────────────┘  └────────────────┘  └───────────────────┘    │
-│              gRPC / Unix Domain Socket (IPC)                      │
+│           newline-delimited JSON / Unix Domain Socket (IPC)       │
 └────────────────────────────┬─────────────────────────────────────┘
                              │
 ┌────────────────────────────▼─────────────────────────────────────┐
@@ -52,7 +52,7 @@ TuxDrive is a production-grade Google Drive desktop synchronization daemon for L
 ## Component Breakdown
 
 ### `tuxdrive-auth`
-Handles OAuth2 device-code and PKCE flows against Google Identity Platform. Stores and refreshes access/refresh tokens using the OS Secret Service (GNOME Keyring via the `keyring` crate). Exposes a simple `AuthManager` trait returning a valid `BearerToken` on demand.
+Handles the OAuth2 loopback/browser-redirect flow against Google Identity Platform — a local loopback server receives the redirect after the user approves in their browser (not device-code flow). Stores and refreshes access/refresh tokens using the OS Secret Service (GNOME Keyring via the `keyring` crate). Exposes a simple `AuthManager` trait returning a valid `BearerToken` on demand.
 
 ### `tuxdrive-drive`
 Thin async HTTP client wrapping the Google Drive v3 REST API:
@@ -100,10 +100,10 @@ Binary entry point:
 
 ### Flutter Frontend
 Dart/Flutter desktop application:
-- **Setup Wizard** — first-run OAuth2 flow, sync-root picker, selective-folder chooser
+- **Login Screen** — first-run OAuth2 flow (browser-redirect), sync-root picker; selective-folder chooser is planned for Phase 2 (schema and DB CRUD exist, but nothing in the sync engine calls it yet)
 - **Main Window** — activity feed, file tree, sync status
 - **System Tray** — sync-in-progress spinner, pause/resume, open folder, quit
-- Connects to the daemon over a Unix socket using the generated gRPC stubs
+- Connects to the daemon over a Unix domain socket using newline-delimited JSON (gRPC is planned for Phase 2 — see [Phased Delivery Plan](#phased-delivery-plan))
 
 ---
 
@@ -227,7 +227,7 @@ CREATE TABLE selective_sync (
 | Concern | Mechanism |
 |---|---|
 | OAuth2 tokens | Stored in OS Secret Service (GNOME Keyring / KWallet) via `keyring` crate |
-| Client secret | Embedded at compile time via `TUXDRIVE_CLIENT_SECRET` env var; never written to disk |
+| Client secret | Bundled default is embedded at compile time via `TUXDRIVE_CLIENT_SECRET` env var and never written to disk. A custom override (advanced/self-host, set via the GUI or `config.toml`'s `[auth]` section) is stored in plaintext in `config.toml` — acceptable per Google's own threat model for installed/desktop app clients, where the client_secret isn't treated as confidential |
 | IPC channel | Unix domain socket with filesystem permissions (0600, owned by the user) |
 | TLS | All HTTP via `reqwest` with native-tls; certificate pinning for Drive API endpoints (Phase 2) |
 | DB encryption | SQLCipher optional (Phase 2) |

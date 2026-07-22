@@ -88,6 +88,32 @@ class SetSyncFolderResult {
   const SetSyncFolderResult({required this.success, this.localRoot, this.error});
 }
 
+/// Whether a custom (advanced/self-host) OAuth client is configured, and its
+/// client_id if so. The client_secret is never sent back over IPC.
+class AuthConfigInfo {
+  final String? clientId;
+  final bool isCustom;
+
+  const AuthConfigInfo({this.clientId, required this.isCustom});
+
+  static const unknown = AuthConfigInfo(isCustom: false);
+}
+
+/// Result of a `set_auth_config` request.
+class SetAuthConfigResult {
+  final bool success;
+  final String? clientId;
+  final bool isCustom;
+  final String? error;
+
+  const SetAuthConfigResult({
+    required this.success,
+    this.clientId,
+    this.isCustom = false,
+    this.error,
+  });
+}
+
 /// Represents a single file or folder entry returned by `list_files`.
 class FileEntry {
   final String name;
@@ -349,6 +375,52 @@ class DaemonClient {
       );
     } catch (e) {
       return SetSyncFolderResult(
+        success: false,
+        error: 'Could not reach the daemon: $e',
+      );
+    }
+  }
+
+  /// Whether a custom (advanced/self-host) OAuth client is configured.
+  Future<AuthConfigInfo> getAuthConfig() async {
+    try {
+      final resp = await _send({'cmd': 'get_auth_config'});
+      if (resp['type'] == 'error') return AuthConfigInfo.unknown;
+      return AuthConfigInfo(
+        clientId: resp['client_id'] as String?,
+        isCustom: (resp['is_custom'] as bool?) ?? false,
+      );
+    } catch (_) {
+      return AuthConfigInfo.unknown;
+    }
+  }
+
+  /// Set a custom OAuth client_id/client_secret (or clear the override if
+  /// both are empty). On success the daemon restarts itself to apply the
+  /// change, which will briefly disconnect this client.
+  Future<SetAuthConfigResult> setAuthConfig(
+    String clientId,
+    String clientSecret,
+  ) async {
+    try {
+      final resp = await _send({
+        'cmd': 'set_auth_config',
+        'client_id': clientId,
+        'client_secret': clientSecret,
+      });
+      if (resp['type'] == 'error') {
+        return SetAuthConfigResult(
+          success: false,
+          error: resp['message'] as String? ?? 'Unknown error',
+        );
+      }
+      return SetAuthConfigResult(
+        success: true,
+        clientId: resp['client_id'] as String?,
+        isCustom: (resp['is_custom'] as bool?) ?? false,
+      );
+    } catch (e) {
+      return SetAuthConfigResult(
         success: false,
         error: 'Could not reach the daemon: $e',
       );

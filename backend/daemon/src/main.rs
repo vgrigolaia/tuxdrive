@@ -33,7 +33,8 @@ struct Cli {
 enum Command {
     /// Start the daemon (default behaviour when no subcommand is given)
     Start,
-    /// Authenticate with Google (device code flow — no browser required)
+    /// Authenticate with Google (loopback/browser-redirect flow — prints a
+    /// URL to open in any browser, then waits for the redirect)
     Login,
     /// Revoke credentials and log out
     Logout,

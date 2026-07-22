@@ -178,7 +178,152 @@ class _Idle extends StatelessWidget {
           label: const Text('Connect Google Drive'),
           style: FilledButton.styleFrom(minimumSize: const Size(220, 44)),
         ),
+        const SizedBox(height: 12),
+        _AdvancedAuthSection(sync: sync),
       ],
+    );
+  }
+}
+
+/// Lets a self-hosting user swap in their own Google Cloud OAuth client_id/
+/// secret instead of the bundled TuxDrive one — e.g. while the bundled
+/// client is still awaiting Google's verification review and is capped at
+/// its allow-listed test users.
+class _AdvancedAuthSection extends StatefulWidget {
+  final SyncProvider sync;
+  const _AdvancedAuthSection({required this.sync});
+
+  @override
+  State<_AdvancedAuthSection> createState() => _AdvancedAuthSectionState();
+}
+
+class _AdvancedAuthSectionState extends State<_AdvancedAuthSection> {
+  bool _expanded = false;
+  bool _submitting = false;
+  String? _error;
+  late final TextEditingController _clientIdController;
+  late final TextEditingController _clientSecretController;
+
+  @override
+  void initState() {
+    super.initState();
+    _clientIdController =
+        TextEditingController(text: widget.sync.authConfig.clientId ?? '');
+    _clientSecretController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _clientIdController.dispose();
+    _clientSecretController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit({required bool clear}) async {
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+    final error = await widget.sync.changeAuthConfig(
+      clear ? '' : _clientIdController.text.trim(),
+      clear ? '' : _clientSecretController.text.trim(),
+    );
+    if (!mounted) return;
+    setState(() {
+      _submitting = false;
+      _error = error;
+      if (error == null && clear) _clientIdController.clear();
+      if (error == null) _clientSecretController.clear();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isCustom = widget.sync.authConfig.isCustom;
+
+    if (!_expanded) {
+      return TextButton.icon(
+        onPressed: () => setState(() => _expanded = true),
+        icon: const Icon(Icons.tune, size: 16),
+        label: Text(
+          isCustom ? 'Using a custom OAuth client' : 'Advanced: use your own OAuth client',
+        ),
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Use your own Google Cloud OAuth client instead of the bundled one — '
+            'useful while the bundled client is still awaiting Google verification. '
+            'Both fields are required together; the secret is never sent back for '
+            'display, so re-enter it any time you change the Client ID.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _clientIdController,
+            enabled: !_submitting,
+            decoration: const InputDecoration(
+              labelText: 'Client ID',
+              isDense: true,
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _clientSecretController,
+            enabled: !_submitting,
+            obscureText: true,
+            decoration: const InputDecoration(
+              labelText: 'Client Secret',
+              isDense: true,
+              border: OutlineInputBorder(),
+            ),
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 8),
+            Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 12)),
+          ],
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              if (isCustom)
+                TextButton(
+                  onPressed: _submitting ? null : () => _submit(clear: true),
+                  child: const Text('Reset to default'),
+                ),
+              const Spacer(),
+              TextButton(
+                onPressed: _submitting ? null : () => setState(() => _expanded = false),
+                child: const Text('Cancel'),
+              ),
+              const SizedBox(width: 8),
+              FilledButton(
+                onPressed: _submitting ? null : () => _submit(clear: false),
+                child: _submitting
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Save & Restart'),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

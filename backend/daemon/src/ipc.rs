@@ -40,6 +40,19 @@ pub enum IpcCommand {
     /// `path` (refusing if it's non-empty), persists the new location to
     /// config.toml, then restarts the daemon so it picks up the new root.
     SetSyncFolder { path: String },
+    /// Return whether a custom OAuth client is configured (advanced/self-host
+    /// setup) and, if so, its client_id. The client_secret is never sent back
+    /// over IPC.
+    GetAuthConfig,
+    /// Set (or, if both fields are blank, clear) a custom OAuth client_id /
+    /// client_secret, persisted to config.toml's `[auth]` section. Restarts
+    /// the daemon so it picks up the new credentials — any signed-in account
+    /// will need to sign in again since its token was issued to the old
+    /// client.
+    SetAuthConfig {
+        client_id: String,
+        client_secret: String,
+    },
 }
 
 /// Responses produced by the daemon and sent back to the client.
@@ -102,6 +115,18 @@ pub enum IpcResponse {
     /// to apply the new sync root.
     SyncFolderChanged {
         local_root: String,
+    },
+    AuthConfig {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        client_id: Option<String>,
+        is_custom: bool,
+    },
+    /// Config saved; the daemon is about to restart itself to apply the new
+    /// (or cleared) OAuth credentials.
+    AuthConfigChanged {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        client_id: Option<String>,
+        is_custom: bool,
     },
 }
 
@@ -403,6 +428,61 @@ async fn dispatch_command(cmd: IpcCommand, state: Arc<DaemonState>) -> IpcRespon
             IpcResponse::SyncFolderChanged {
                 local_root: new_root.to_string_lossy().into_owned(),
             }
+        }
+
+        // ---- Advanced/self-host OAuth client -------------------------------
+        IpcCommand::GetAuthConfig => {
+            let client_id = state.cfg.auth.client_id.clone();
+            let is_custom = client_id.as_deref().is_some_and(|s| !s.is_empty());
+            IpcResponse::AuthConfig { client_id, is_custom }
+        }
+
+        IpcCommand::SetAuthConfig { client_id, client_secret } => {
+            let client_id = client_id.trim().to_string();
+            let client_secret = client_secret.trim().to_string();
+
+            let mut new_cfg = state.cfg.clone();
+            match (client_id.is_empty(), client_secret.is_empty()) {
+                // Both blank — clear the override and fall back to the
+                // bundled default.
+                (true, true) => {
+                    new_cfg.auth.client_id = None;
+                    new_cfg.auth.client_secret = None;
+                }
+                (false, false) => {
+                    new_cfg.auth.client_id = Some(client_id);
+                    new_cfg.auth.client_secret = Some(client_secret);
+                }
+                _ => {
+                    return IpcResponse::Error {
+                        message: "Provide both Client ID and Client Secret, or leave both \
+                                  blank to use the default."
+                            .into(),
+                    };
+                }
+            }
+
+            if let Err(e) = new_cfg.save() {
+                return IpcResponse::Error {
+                    message: format!("Saving config failed: {e}"),
+                };
+            }
+
+            let client_id = new_cfg.auth.client_id.clone();
+            let is_custom = client_id.is_some();
+
+            // AuthManager's OAuth client is built once at startup from the
+            // loaded config — same hot-swap limitation as the sync folder
+            // above, so restart to pick up the new credentials. Any
+            // signed-in account will need to sign in again, since its token
+            // was issued to the old client.
+            tokio::spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_millis(400)).await;
+                info!("restarting daemon to apply new OAuth client credentials");
+                std::process::exit(75);
+            });
+
+            IpcResponse::AuthConfigChanged { client_id, is_custom }
         }
 
         // ---- Logout ---------------------------------------------------------

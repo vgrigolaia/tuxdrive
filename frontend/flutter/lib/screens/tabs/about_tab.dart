@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../providers/sync_provider.dart';
+import '../../version.dart';
 import '../../widgets/change_sync_folder_dialog.dart';
 
 /// Static information screen: version, license, links, and daemon connection
@@ -9,7 +10,7 @@ import '../../widgets/change_sync_folder_dialog.dart';
 class AboutTab extends StatelessWidget {
   const AboutTab({super.key});
 
-  static const String _version = '0.1.2';
+  static const String _version = kAppVersion;
   static const String _githubUrl = 'https://github.com/vgrigolaia/tuxdrive';
   static const String _license = 'MIT';
 

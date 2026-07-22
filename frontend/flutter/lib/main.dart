@@ -51,6 +51,7 @@ class _AppRootState extends State<AppRoot> {
     // Start connection attempt after the first frame.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<SyncProvider>().connect();
+      context.read<SyncProvider>().checkForUpdate();
     });
   }
 

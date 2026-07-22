@@ -2,7 +2,9 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../providers/sync_provider.dart';
+import '../services/update_checker.dart';
 import '../widgets/sync_status_badge.dart';
 import 'tabs/files_tab.dart';
 import 'tabs/logs_tab.dart';
@@ -36,9 +38,20 @@ class _MainScreenState extends State<MainScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: _buildAppBar(context),
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: _screens,
+      body: Column(
+        children: [
+          Consumer<SyncProvider>(
+            builder: (_, sync, __) => sync.updateCheck.updateAvailable
+                ? _UpdateBanner(result: sync.updateCheck)
+                : const SizedBox.shrink(),
+          ),
+          Expanded(
+            child: IndexedStack(
+              index: _selectedIndex,
+              children: _screens,
+            ),
+          ),
+        ],
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
@@ -304,3 +317,44 @@ class _TabDef {
 }
 
 enum _MenuAction { reconnect, logout, shutdown }
+
+/// Dismissible banner shown when a newer TuxDrive release is available on
+/// GitHub. Links out to the release page — this never downloads or installs
+/// anything itself.
+class _UpdateBanner extends StatelessWidget {
+  final UpdateCheckResult result;
+  const _UpdateBanner({required this.result});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      width: double.infinity,
+      color: colorScheme.primaryContainer,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(
+        children: [
+          Icon(Icons.system_update, size: 18, color: colorScheme.onPrimaryContainer),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'TuxDrive v${result.latestVersion} is available.',
+              style: TextStyle(color: colorScheme.onPrimaryContainer),
+            ),
+          ),
+          TextButton(
+            onPressed: result.releaseUrl == null
+                ? null
+                : () => launchUrl(Uri.parse(result.releaseUrl!)),
+            child: const Text('View release'),
+          ),
+          IconButton(
+            onPressed: () => context.read<SyncProvider>().dismissUpdateBanner(),
+            icon: Icon(Icons.close, size: 18, color: colorScheme.onPrimaryContainer),
+            tooltip: 'Dismiss',
+          ),
+        ],
+      ),
+    );
+  }
+}

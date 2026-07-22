@@ -1,11 +1,14 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../ipc/daemon_client.dart';
+import '../services/update_checker.dart';
+import '../version.dart';
 
 /// Central state provider. Wraps [DaemonClient] and exposes reactive state to
 /// the widget tree via [ChangeNotifier].
 class SyncProvider extends ChangeNotifier {
   final DaemonClient _client;
+  final UpdateChecker _updateChecker = UpdateChecker();
   Timer? _pollTimer;
   Timer? _loginPollTimer;
 
@@ -17,6 +20,7 @@ class SyncProvider extends ChangeNotifier {
   LoginStatus _loginStatus = LoginStatus.idle;
   String? _syncFolder;
   AuthConfigInfo _authConfig = AuthConfigInfo.unknown;
+  UpdateCheckResult _updateCheck = UpdateCheckResult.none;
 
   SyncProvider(this._client);
 
@@ -44,6 +48,7 @@ class SyncProvider extends ChangeNotifier {
   String? get loginError => _loginStatus.error;
   String? get syncFolder => _syncFolder;
   AuthConfigInfo get authConfig => _authConfig;
+  UpdateCheckResult get updateCheck => _updateCheck;
 
   // ---------------------------------------------------------------------------
   // Connection management
@@ -204,6 +209,18 @@ class SyncProvider extends ChangeNotifier {
     _syncFolder = result.localRoot;
     notifyListeners();
     return null;
+  }
+
+  /// Check GitHub Releases for a newer TuxDrive version. Independent of the
+  /// daemon connection — this is a direct network call, not IPC.
+  Future<void> checkForUpdate() async {
+    _updateCheck = await _updateChecker.check(kAppVersion);
+    notifyListeners();
+  }
+
+  void dismissUpdateBanner() {
+    _updateCheck = UpdateCheckResult.none;
+    notifyListeners();
   }
 
   Future<void> loadAuthConfig() async {

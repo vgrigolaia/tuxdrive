@@ -222,6 +222,30 @@ sudo install -m 755 scripts/tuxdrive-ctl       "${BIN_DIR}/tuxdrive-ctl"       2
 sudo install -m 755 scripts/tuxdrive-indicator "${BIN_DIR}/tuxdrive-indicator" 2>/dev/null || true
 info "Installed: ${BIN_DIR}/tuxdrive-ctl  ${BIN_DIR}/tuxdrive-indicator"
 
+# Install Flutter itself if missing, via snap — the same install method
+# already used in this project's own dev/CI environment. Never fatal: if any
+# step here fails, we fall through to the existing "Flutter not found"
+# warning below and the daemon/CLI still install fine without the GUI.
+if ! command -v flutter &>/dev/null; then
+    info "Flutter not found — installing via snap..."
+    if ! command -v snap &>/dev/null; then
+        pkg_install_all snapd || warn "Could not install snapd."
+        [[ -e /snap ]] || sudo ln -s /var/lib/snapd/snap /snap 2>/dev/null || true
+        sudo systemctl enable --now snapd.socket &>/dev/null || true
+    fi
+    if command -v snap &>/dev/null; then
+        sudo snap install flutter --classic || \
+            warn "snap install flutter failed — install manually: https://docs.flutter.dev/get-started/install/linux, then re-run ./install.sh."
+        # Make it usable in *this* run without needing a fresh login shell —
+        # snapd's own PATH setup (/etc/profile.d/snapd.sh) only applies to
+        # new sessions.
+        export PATH="/snap/bin:${PATH}"
+    else
+        warn "snapd was just installed but isn't ready yet (needs a fresh login session for its socket/PATH setup)."
+        warn "Log out and back in, then run: sudo snap install flutter --classic, then re-run ./install.sh."
+    fi
+fi
+
 # Build and install the Flutter GUI — this is what end users actually run;
 # everything past this point (login, sync-conflict resolution, status,
 # pause/resume) happens in the app, not the terminal.

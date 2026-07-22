@@ -6,6 +6,11 @@ All notable changes to TuxDrive are documented here. Versions follow
 
 ## 0.1.3
 
+- `install.sh` now auto-installs Flutter via snap when it's missing, instead
+  of just skipping the GUI build with a warning — reported after a fresh
+  Fedora install produced a working daemon but no GUI, icon, or app-menu
+  entry because Flutter wasn't present. Never fatal: falls back to the
+  existing warning (daemon/CLI-only install) if snapd isn't available either.
 - Add `.deb` and `.rpm` packaging (`packaging/build-packages.sh`) as an
   alternative to `install.sh` — both stage the same file layout.
 - Add a GitHub Actions release workflow that builds and attaches both

@@ -101,8 +101,18 @@ impl LoopbackServer {
                             .await;
                         return Err(AuthError::OAuthError("OAuth state mismatch".into()));
                     }
-                    let body = b"<html><body><h2>Login successful!</h2>\
-                        <p>You can close this tab and return to the terminal.</p>\
+                    // Attempt to self-close the tab — browsers only honor
+                    // this for tabs opened via window.open() by a script,
+                    // which this one wasn't (the OS opened it), so it's a
+                    // harmless best-effort, not a guarantee; the fallback
+                    // message below covers the common case where it's ignored.
+                    let body = b"<html><head><style>\
+                        body{font-family:system-ui,sans-serif;text-align:center;padding-top:15vh;color:#202124}\
+                        h2{color:#1a73e8}\
+                        </style></head><body>\
+                        <h2>TuxDrive: Login successful!</h2>\
+                        <p>You can close this tab and return to TuxDrive.</p>\
+                        <script>window.close();</script>\
                         </body></html>";
                     let header = format!(
                         "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\

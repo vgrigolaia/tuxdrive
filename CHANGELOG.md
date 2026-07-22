@@ -6,6 +6,11 @@ All notable changes to TuxDrive are documented here. Versions follow
 
 ## 0.1.3
 
+- OAuth success page (shown in the browser after granting access) now
+  attempts to self-close its tab and looks less bare. Browsers only allow
+  `window.close()` for tabs opened via script, which this one isn't (the OS
+  opens it) — so this is a harmless best-effort, not a guaranteed close;
+  the "you can close this tab" message still covers the common case.
 - Fix `tuxdrive-indicator`'s "Open folder" menu item being hardcoded to
   `~/GoogleDrive`, which was never the actual sync folder name/location —
   now asks the daemon for the real (possibly user-changed) path.

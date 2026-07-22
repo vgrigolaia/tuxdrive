@@ -4,7 +4,7 @@ All notable changes to TuxDrive are documented here. Versions follow
 `scripts/bump-version.sh`, which keeps `Cargo.toml`, `pubspec.yaml`, and
 `lib/version.dart` in sync.
 
-## 0.1.3
+## 0.1.4
 
 - OAuth success page (shown in the browser after granting access) now
   attempts to self-close its tab and looks less bare. Browsers only allow
@@ -24,6 +24,9 @@ All notable changes to TuxDrive are documented here. Versions follow
   Fedora install produced a working daemon but no GUI, icon, or app-menu
   entry because Flutter wasn't present. Never fatal: falls back to the
   existing warning (daemon/CLI-only install) if snapd isn't available either.
+
+## 0.1.3
+
 - Add `.deb` and `.rpm` packaging (`packaging/build-packages.sh`) as an
   alternative to `install.sh` — both stage the same file layout.
 - Add a GitHub Actions release workflow that builds and attaches both

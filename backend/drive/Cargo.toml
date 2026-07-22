@@ -1,0 +1,28 @@
+[package]
+name        = "tuxdrive-drive"
+description = "Google Drive REST API client for TuxDrive"
+version.workspace    = true
+edition.workspace    = true
+authors.workspace    = true
+license.workspace    = true
+
+[dependencies]
+tuxdrive-auth  = { workspace = true }
+parking_lot  = { workspace = true }
+tokio        = { workspace = true }
+reqwest      = { workspace = true }
+serde        = { workspace = true }
+serde_json   = { workspace = true }
+thiserror    = { workspace = true }
+anyhow       = { workspace = true }
+tracing      = { workspace = true }
+chrono       = { workspace = true }
+bytes        = { workspace = true }
+futures      = { workspace = true }
+async-trait  = { workspace = true }
+url          = { workspace = true }
+tokio-stream = { workspace = true }
+
+[dev-dependencies]
+tokio        = { workspace = true, features = ["test-util"] }
+mockito      = "1"

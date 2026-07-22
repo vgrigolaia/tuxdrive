@@ -1,0 +1,134 @@
+#!/usr/bin/env python3
+"""
+tuxdrive-ctl — simple control client for the tuxdrive-daemon.
+
+Usage:
+  tuxdrive-ctl status
+  tuxdrive-ctl pause
+  tuxdrive-ctl resume
+  tuxdrive-ctl files [FOLDER]
+  tuxdrive-ctl logs [N]
+  tuxdrive-ctl stop
+"""
+import socket, json, sys, os, textwrap
+
+SOCK = os.path.expanduser("~/.local/share/tuxdrive/daemon.sock")
+
+def send(cmd: dict) -> dict:
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
+        try:
+            s.connect(SOCK)
+        except FileNotFoundError:
+            print("ERROR: daemon is not running  (socket not found)")
+            print("       Start it with:  tuxdrive-daemon start &")
+            sys.exit(1)
+        except ConnectionRefusedError:
+            print("ERROR: daemon is not running  (connection refused)")
+            sys.exit(1)
+        s.sendall((json.dumps(cmd) + "\n").encode())
+        data = b""
+        while True:
+            chunk = s.recv(4096)
+            if not chunk:
+                break
+            data += chunk
+            if b"\n" in data:
+                break
+    return json.loads(data.split(b"\n")[0])
+
+
+def fmt_bytes(n: int) -> str:
+    for unit in ("B", "KB", "MB", "GB", "TB"):
+        if n < 1024:
+            return f"{n:.1f} {unit}"
+        n /= 1024
+    return f"{n:.1f} PB"
+
+
+def fmt_eta(seconds) -> str:
+    if seconds is None:
+        return ""
+    seconds = int(seconds)
+    if seconds < 60:
+        return f"{seconds}s"
+    minutes = seconds // 60
+    if minutes < 60:
+        return f"{minutes}m {seconds % 60}s"
+    hours = minutes // 60
+    return f"{hours}h {minutes % 60}m"
+
+
+def cmd_status():
+    r = send({"cmd": "get_status"})
+    status  = r.get("status", "?")
+    queued  = r.get("queued", 0)
+    email   = r.get("account_email") or "(not logged in)"
+    paused  = r.get("paused", False)
+    eta     = r.get("eta_seconds")
+
+    icon = {"synced": "✅", "syncing": "🔄", "paused": "⏸️ ", "error": "❌"}.get(status, "❓")
+    print(f"\n  {icon}  {status.upper()}{'  (paused)' if paused else ''}")
+    print(f"  Account : {email}")
+    eta_str = fmt_eta(eta)
+    print(f"  Queued  : {queued} item(s)" + (f"  (~{eta_str} left)" if eta_str else "") + "\n")
+
+
+def cmd_pause():
+    send({"cmd": "pause"})
+    print("⏸️   Sync paused.")
+
+
+def cmd_resume():
+    send({"cmd": "resume"})
+    print("▶️   Sync resumed.")
+
+
+def cmd_files(folder=""):
+    r = send({"cmd": "list_files", "folder_path": folder})
+    entries = r.get("entries", [])
+    if not entries:
+        print("  (no files)")
+        return
+    print(f"\n  {'NAME':<40} {'STATUS':<12} {'SIZE':>10}")
+    print("  " + "-" * 65)
+    for e in entries:
+        icon = "📁" if e.get("is_folder") else "📄"
+        name = textwrap.shorten(e.get("name", ""), 38)
+        size = fmt_bytes(e.get("size", 0)) if not e.get("is_folder") else ""
+        status = e.get("sync_status", "")
+        print(f"  {icon} {name:<38} {status:<12} {size:>10}")
+    print()
+
+
+def cmd_logs(n=50):
+    r = send({"cmd": "get_logs", "lines": int(n)})
+    for line in r.get("lines", []):
+        print(line)
+
+
+def cmd_stop():
+    send({"cmd": "shutdown"})
+    print("🛑  Daemon shutdown requested.")
+
+
+COMMANDS = {
+    "status":  (cmd_status,  []),
+    "pause":   (cmd_pause,   []),
+    "resume":  (cmd_resume,  []),
+    "files":   (cmd_files,   ["folder"]),
+    "logs":    (cmd_logs,    ["n"]),
+    "stop":    (cmd_stop,    []),
+}
+
+if __name__ == "__main__":
+    args = sys.argv[1:]
+    if not args or args[0] in ("-h", "--help"):
+        print(__doc__)
+        sys.exit(0)
+    name = args[0]
+    if name not in COMMANDS:
+        print(f"Unknown command: {name}")
+        print(f"Available: {', '.join(COMMANDS)}")
+        sys.exit(1)
+    fn, _ = COMMANDS[name]
+    fn(*args[1:])

@@ -1,0 +1,26 @@
+[package]
+name        = "tuxdrive-scheduler"
+description = "Task scheduler with retry/backoff for TuxDrive"
+version.workspace    = true
+edition.workspace    = true
+authors.workspace    = true
+license.workspace    = true
+
+[dependencies]
+tuxdrive-auth     = { workspace = true }
+tuxdrive-drive    = { workspace = true }
+tuxdrive-database = { workspace = true }
+tuxdrive-sync     = { workspace = true }
+tokio           = { workspace = true }
+tokio-stream    = { workspace = true }
+futures         = { workspace = true }
+thiserror       = { workspace = true }
+anyhow          = { workspace = true }
+tracing         = { workspace = true }
+chrono          = { workspace = true }
+async-trait     = { workspace = true }
+parking_lot     = { workspace = true }
+rand            = { workspace = true }
+
+[dev-dependencies]
+tokio           = { workspace = true, features = ["test-util"] }

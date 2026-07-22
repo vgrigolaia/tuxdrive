@@ -1,0 +1,44 @@
+# Rust
+target/
+**/*.rs.bk
+Cargo.lock
+
+# Flutter
+frontend/flutter/.dart_tool/
+frontend/flutter/.flutter-plugins
+frontend/flutter/.flutter-plugins-dependencies
+frontend/flutter/.packages
+frontend/flutter/build/
+frontend/flutter/ios/
+frontend/flutter/macos/
+frontend/flutter/windows/
+frontend/flutter/.idea/
+frontend/flutter/*.iml
+
+# Secrets / credentials (never commit)
+*.pem
+*.key
+client_secret*.json
+credentials.json
+token.json
+.env
+.env.*
+
+# Database
+*.db
+*.db-shm
+*.db-wal
+
+# Logs
+*.log
+logs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

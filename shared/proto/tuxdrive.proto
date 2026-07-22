@@ -1,0 +1,130 @@
+syntax = "proto3";
+package tuxdrive;
+option java_package = "com.tuxdrive.ipc";
+
+// ── Status and state types ──────────────────────────────────────────────────
+
+enum SyncStatus {
+  SYNC_STATUS_UNKNOWN = 0;
+  SYNC_STATUS_SYNCED = 1;
+  SYNC_STATUS_SYNCING = 2;
+  SYNC_STATUS_PAUSED = 3;
+  SYNC_STATUS_ERROR = 4;
+  SYNC_STATUS_OFFLINE = 5;
+  SYNC_STATUS_AUTHENTICATING = 6;
+}
+
+message FileEntry {
+  string id = 1;
+  string name = 2;
+  string relative_path = 3;
+  string mime_type = 4;
+  int64 size = 5;
+  string sync_status = 6;   // "synced", "uploading", "downloading", "conflict", "error"
+  string modified_time = 7; // RFC3339
+  bool is_folder = 8;
+  bool has_conflict = 9;
+}
+
+message SyncProgress {
+  int64 bytes_transferred = 1;
+  int64 total_bytes = 2;
+  int32 files_queued = 3;
+  int32 files_done = 4;
+  string current_file = 5;
+  SyncStatus status = 6;
+}
+
+message AccountInfo {
+  string email = 1;
+  string display_name = 2;
+  int64 storage_used = 3;
+  int64 storage_total = 4;
+}
+
+// ── Requests / Responses ────────────────────────────────────────────────────
+
+message GetStatusRequest {}
+message GetStatusResponse {
+  SyncStatus status = 1;
+  SyncProgress progress = 2;
+  AccountInfo account = 3;
+}
+
+message PauseRequest {}
+message PauseResponse { bool success = 1; }
+
+message ResumeRequest {}
+message ResumeResponse { bool success = 1; }
+
+message LoginRequest {
+  string client_id = 1;
+  string client_secret = 2;
+}
+message LoginResponse {
+  bool success = 1;
+  string verification_url = 2;   // for device code flow: show to user
+  string user_code = 3;
+  string error = 4;
+}
+
+message LogoutRequest { string email = 1; }
+message LogoutResponse { bool success = 1; string error = 2; }
+
+message ListFilesRequest {
+  string folder_path = 1;   // relative path, empty = root
+  int32 page_size = 2;
+  string page_token = 3;
+}
+message ListFilesResponse {
+  repeated FileEntry files = 1;
+  string next_page_token = 2;
+}
+
+message GetFileRequest { string relative_path = 1; }
+message GetFileResponse { FileEntry file = 1; }
+
+message SelectiveSyncFolder {
+  string drive_folder_id = 1;
+  string folder_path = 2;
+  bool enabled = 3;
+}
+message GetSelectiveSyncRequest {}
+message GetSelectiveSyncResponse { repeated SelectiveSyncFolder folders = 1; }
+message SetSelectiveSyncRequest { repeated SelectiveSyncFolder folders = 1; }
+message SetSelectiveSyncResponse { bool success = 1; }
+
+message GetLogsRequest { int32 lines = 1; }
+message GetLogsResponse { repeated string lines = 1; }
+
+message OpenSyncFolderRequest {}
+message OpenSyncFolderResponse { string path = 1; }
+
+// ── Streaming events ────────────────────────────────────────────────────────
+
+message StatusEvent {
+  SyncStatus status = 1;
+  SyncProgress progress = 2;
+  string message = 3;
+  FileEntry changed_file = 4;   // the file that triggered this event
+}
+
+// ── Service definition ──────────────────────────────────────────────────────
+
+service TuxDriveDaemon {
+  // Unary RPCs
+  rpc GetStatus(GetStatusRequest) returns (GetStatusResponse);
+  rpc Pause(PauseRequest) returns (PauseResponse);
+  rpc Resume(ResumeRequest) returns (ResumeResponse);
+  rpc Login(LoginRequest) returns (LoginResponse);
+  rpc Logout(LogoutRequest) returns (LogoutResponse);
+  rpc ListFiles(ListFilesRequest) returns (ListFilesResponse);
+  rpc GetFile(GetFileRequest) returns (GetFileResponse);
+  rpc GetSelectiveSync(GetSelectiveSyncRequest) returns (GetSelectiveSyncResponse);
+  rpc SetSelectiveSync(SetSelectiveSyncRequest) returns (SetSelectiveSyncResponse);
+  rpc GetLogs(GetLogsRequest) returns (GetLogsResponse);
+  rpc OpenSyncFolder(OpenSyncFolderRequest) returns (OpenSyncFolderResponse);
+
+  // Server-streaming RPC for real-time status updates
+  rpc WatchStatus(GetStatusRequest) returns (stream StatusEvent);
+}

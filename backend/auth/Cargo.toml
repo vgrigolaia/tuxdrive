@@ -1,0 +1,31 @@
+[package]
+name        = "tuxdrive-auth"
+description = "OAuth2 authentication and secure token storage for TuxDrive"
+version.workspace    = true
+edition.workspace    = true
+authors.workspace    = true
+license.workspace    = true
+
+[dependencies]
+tokio        = { workspace = true }
+reqwest      = { workspace = true }
+serde        = { workspace = true }
+serde_json   = { workspace = true }
+keyring      = { workspace = true }
+thiserror    = { workspace = true }
+anyhow       = { workspace = true }
+tracing      = { workspace = true }
+chrono       = { workspace = true }
+url          = { workspace = true }
+uuid         = { workspace = true }
+rand         = { workspace = true }
+tokio-stream = { workspace = true }
+async-trait  = { workspace = true }
+parking_lot  = { workspace = true }
+base64       = "0.22"
+sha2         = { workspace = true }
+hex          = { workspace = true }
+
+[dev-dependencies]
+tokio        = { workspace = true, features = ["test-util"] }
+mockito      = "1"

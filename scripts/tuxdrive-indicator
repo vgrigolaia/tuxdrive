@@ -1,0 +1,180 @@
+#!/usr/bin/env python3
+"""
+TuxDrive GNOME tray indicator.
+Shows sync status and a right-click menu in the GNOME top bar.
+Requires: gir1.2-appindicator3-0.1  OR  gir1.2-ayatanaappindicator3-0.1
+          gnome-shell-extension-appindicator (for GNOME Shell)
+"""
+import gi
+import os
+import sys
+import json
+import socket
+
+# Try both AppIndicator variants (Ubuntu ships either depending on version)
+INDICATOR_MODULE = None
+for mod, ver in [("AyatanaAppIndicator3", "0.1"), ("AppIndicator3", "0.1")]:
+    try:
+        gi.require_version(mod, ver)
+        INDICATOR_MODULE = mod
+        break
+    except ValueError:
+        pass
+
+if INDICATOR_MODULE is None:
+    print("ERROR: No AppIndicator library found.", file=sys.stderr)
+    print("Install one of:", file=sys.stderr)
+    print("  sudo apt install gir1.2-ayatanaappindicator3-0.1", file=sys.stderr)
+    print("  sudo apt install gir1.2-appindicator3-0.1", file=sys.stderr)
+    sys.exit(1)
+
+gi.require_version("Gtk", "3.0")
+from gi.repository import Gtk, GLib
+exec(f"from gi.repository import {INDICATOR_MODULE} as AppIndicator3")
+
+SOCK = os.path.expanduser("~/.local/share/tuxdrive/daemon.sock")
+DRIVE_DIR = os.path.expanduser("~/GoogleDrive")
+APP_BIN = "/opt/tuxdrive/tuxdrive_flutter"
+
+
+def fmt_eta(seconds):
+    if seconds is None:
+        return ""
+    seconds = int(seconds)
+    if seconds < 60:
+        return f"{seconds}s"
+    minutes = seconds // 60
+    if minutes < 60:
+        return f"{minutes}m"
+    hours = minutes // 60
+    return f"{hours}h {minutes % 60}m"
+
+ICONS = {
+    "synced":   "emblem-default-symbolic",
+    "syncing":  "emblem-synchronizing-symbolic",
+    "paused":   "media-playback-pause-symbolic",
+    "error":    "dialog-error-symbolic",
+    "offline":  "network-offline-symbolic",
+}
+
+
+def ipc(cmd: dict) -> dict | None:
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
+            s.settimeout(2)
+            s.connect(SOCK)
+            s.sendall((json.dumps(cmd) + "\n").encode())
+            data = b""
+            while True:
+                chunk = s.recv(4096)
+                if not chunk or b"\n" in chunk:
+                    data += chunk
+                    break
+                data += chunk
+            return json.loads(data.split(b"\n")[0])
+    except Exception:
+        return None
+
+
+class TuxDriveIndicator:
+    def __init__(self):
+        self.paused = False
+
+        self.ind = AppIndicator3.Indicator.new(
+            "tuxdrive-indicator",
+            ICONS["offline"],
+            AppIndicator3.IndicatorCategory.APPLICATION_STATUS,
+        )
+        self.ind.set_status(AppIndicator3.IndicatorStatus.ACTIVE)
+
+        self._build_menu()
+        self.update()
+        GLib.timeout_add_seconds(3, self.update)
+
+    def _build_menu(self):
+        menu = Gtk.Menu()
+
+        self.lbl_account = Gtk.MenuItem(label="Not logged in")
+        self.lbl_account.set_sensitive(False)
+        menu.append(self.lbl_account)
+
+        self.lbl_status = Gtk.MenuItem(label="Daemon not running")
+        self.lbl_status.set_sensitive(False)
+        menu.append(self.lbl_status)
+
+        self.lbl_queued = Gtk.MenuItem(label="")
+        self.lbl_queued.set_sensitive(False)
+        menu.append(self.lbl_queued)
+
+        menu.append(Gtk.SeparatorMenuItem())
+
+        if os.path.exists(APP_BIN):
+            open_app_item = Gtk.MenuItem(label="Open TuxDrive")
+            open_app_item.connect("activate", self._open_app)
+            menu.append(open_app_item)
+
+        open_item = Gtk.MenuItem(label="Open GoogleDrive folder")
+        open_item.connect("activate", self._open_folder)
+        menu.append(open_item)
+
+        self.pause_item = Gtk.MenuItem(label="Pause sync")
+        self.pause_item.connect("activate", self._toggle_pause)
+        menu.append(self.pause_item)
+
+        menu.append(Gtk.SeparatorMenuItem())
+
+        quit_item = Gtk.MenuItem(label="Quit indicator")
+        quit_item.connect("activate", lambda _: Gtk.main_quit())
+        menu.append(quit_item)
+
+        menu.show_all()
+        self.ind.set_menu(menu)
+        self.pause_item.hide()
+
+    def update(self):
+        r = ipc({"cmd": "get_status"})
+        if r is None:
+            self.ind.set_icon_full(ICONS["offline"], "Daemon offline")
+            self.lbl_account.set_label("Daemon not running")
+            self.lbl_status.set_label("Run: tuxdrive-daemon start")
+            self.lbl_queued.set_label("")
+            self.pause_item.hide()
+        else:
+            st = r.get("status", "unknown")
+            self.paused = r.get("paused", False)
+            queued = r.get("queued", 0)
+            email = r.get("account_email") or "Not logged in"
+            eta = fmt_eta(r.get("eta_seconds"))
+
+            icon = ICONS.get("paused" if self.paused else st, ICONS["offline"])
+            self.ind.set_icon_full(icon, f"TuxDrive: {st}")
+            self.lbl_account.set_label(email)
+            self.lbl_status.set_label(f"Status: {'PAUSED' if self.paused else st.upper()}")
+            if queued:
+                label = f"{queued} item(s) queued"
+                if eta:
+                    label += f" (~{eta} left)"
+                self.lbl_queued.set_label(label)
+            else:
+                self.lbl_queued.set_label("")
+            self.pause_item.set_label("Resume sync" if self.paused else "Pause sync")
+            self.pause_item.show()
+
+        return True  # keep the GLib timer running
+
+    def _open_folder(self, _):
+        os.makedirs(DRIVE_DIR, exist_ok=True)
+        os.system(f"xdg-open '{DRIVE_DIR}'")
+
+    def _open_app(self, _):
+        os.system(f"nohup '{APP_BIN}' >/dev/null 2>&1 &")
+
+    def _toggle_pause(self, _):
+        cmd = "resume" if self.paused else "pause"
+        ipc({"cmd": cmd})
+        self.update()
+
+
+if __name__ == "__main__":
+    TuxDriveIndicator()
+    Gtk.main()

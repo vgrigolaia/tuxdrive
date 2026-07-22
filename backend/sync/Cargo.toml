@@ -1,0 +1,34 @@
+[package]
+name        = "tuxdrive-sync"
+description = "Bidirectional sync engine for TuxDrive"
+version.workspace    = true
+edition.workspace    = true
+authors.workspace    = true
+license.workspace    = true
+
+[dependencies]
+tuxdrive-auth     = { workspace = true }
+tuxdrive-drive    = { workspace = true }
+tuxdrive-database = { workspace = true }
+tuxdrive-watcher  = { workspace = true }
+tokio           = { workspace = true }
+tokio-stream    = { workspace = true }
+futures         = { workspace = true }
+serde           = { workspace = true }
+serde_json      = { workspace = true }
+thiserror       = { workspace = true }
+anyhow          = { workspace = true }
+tracing         = { workspace = true }
+chrono          = { workspace = true }
+sha2            = { workspace = true }
+hex             = { workspace = true }
+bytes           = { workspace = true }
+async-trait     = { workspace = true }
+parking_lot     = { workspace = true }
+dashmap         = { workspace = true }
+uuid            = { workspace = true }
+tokio-util      = { version = "0.7", features = ["io"] }
+
+[dev-dependencies]
+tokio           = { workspace = true, features = ["test-util"] }
+tempfile        = "3"

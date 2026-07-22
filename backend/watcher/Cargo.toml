@@ -1,0 +1,22 @@
+[package]
+name        = "tuxdrive-watcher"
+description = "Linux inotify filesystem watcher for TuxDrive"
+version.workspace    = true
+edition.workspace    = true
+authors.workspace    = true
+license.workspace    = true
+
+[dependencies]
+tokio        = { workspace = true }
+notify       = { workspace = true }
+notify-debouncer-full = { workspace = true }
+thiserror    = { workspace = true }
+anyhow       = { workspace = true }
+tracing      = { workspace = true }
+futures      = { workspace = true }
+tokio-stream = { workspace = true }
+async-trait  = { workspace = true }
+
+[dev-dependencies]
+tokio        = { workspace = true, features = ["test-util"] }
+tempfile     = "3"

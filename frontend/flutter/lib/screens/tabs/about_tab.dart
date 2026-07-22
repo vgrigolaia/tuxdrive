@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../providers/sync_provider.dart';
 import '../../widgets/change_sync_folder_dialog.dart';
 
@@ -8,8 +9,8 @@ import '../../widgets/change_sync_folder_dialog.dart';
 class AboutTab extends StatelessWidget {
   const AboutTab({super.key});
 
-  static const String _version = '0.1.0';
-  static const String _githubUrl = 'https://github.com/your-org/tuxdrive';
+  static const String _version = '0.1.2';
+  static const String _githubUrl = 'https://github.com/vgrigolaia/tuxdrive';
   static const String _license = 'MIT';
 
   @override
@@ -105,12 +106,15 @@ class AboutTab extends StatelessWidget {
                         const SizedBox(width: 8),
                         const Text('Source code:  '),
                         Expanded(
-                          child: SelectableText(
-                            _githubUrl,
-                            style: TextStyle(
-                              color:
-                                  Theme.of(context).colorScheme.primary,
-                              decoration: TextDecoration.underline,
+                          child: InkWell(
+                            onTap: () => launchUrl(Uri.parse(_githubUrl)),
+                            child: Text(
+                              _githubUrl,
+                              style: TextStyle(
+                                color:
+                                    Theme.of(context).colorScheme.primary,
+                                decoration: TextDecoration.underline,
+                              ),
                             ),
                           ),
                         ),
@@ -124,7 +128,7 @@ class AboutTab extends StatelessWidget {
               // ---- Copyright ----
               Center(
                 child: Text(
-                  'Copyright © 2024 TuxDrive contributors.\n'
+                  'Copyright © 2026 TuxDrive contributors.\n'
                   'Released under the MIT License.',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(

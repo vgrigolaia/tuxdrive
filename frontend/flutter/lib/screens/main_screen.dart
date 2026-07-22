@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/sync_provider.dart';
@@ -117,6 +119,17 @@ class _MainScreenState extends State<MainScreen> {
           },
         ),
 
+        // Open sync folder in the system file manager
+        Consumer<SyncProvider>(
+          builder: (_, sync, __) => IconButton(
+            onPressed: sync.syncFolder == null
+                ? null
+                : () => _openSyncFolder(context, sync.syncFolder!),
+            icon: const Icon(Icons.folder_open),
+            tooltip: 'Open TuxDrive Folder',
+          ),
+        ),
+
         // Pause / Resume
         Consumer<SyncProvider>(
           builder: (_, sync, __) => IconButton(
@@ -172,6 +185,23 @@ class _MainScreenState extends State<MainScreen> {
   // ---------------------------------------------------------------------------
   // Actions
   // ---------------------------------------------------------------------------
+
+  Future<void> _openSyncFolder(BuildContext context, String path) async {
+    try {
+      final result = await Process.run('xdg-open', [path]);
+      if (result.exitCode != 0 && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not open $path')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not open folder: $e')),
+        );
+      }
+    }
+  }
 
   Future<void> _confirmLogout(BuildContext context, SyncProvider sync) async {
     final ok = await showDialog<bool>(

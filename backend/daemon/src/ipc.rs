@@ -1,4 +1,3 @@
-use std::collections::VecDeque;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -155,8 +154,9 @@ pub struct DaemonState {
     /// IPC after the daemon started is picked up immediately by both.
     pub account_email: Arc<RwLock<String>>,
     pub paused: RwLock<bool>,
-    /// Circular buffer of recent log lines (newest at the back).
-    pub log_buffer: RwLock<VecDeque<String>>,
+    /// Circular buffer of recent log lines (newest at the back), fed
+    /// directly by the `tracing` subscriber — see `crate::logging`.
+    pub log_buffer: crate::logging::LogBuffer,
     /// Progress of an in-flight (or just-completed) GUI-driven login.
     pub login_state: RwLock<LoginState>,
     /// Full conflict details stashed between `ConflictPending` and the
@@ -176,6 +176,7 @@ impl DaemonState {
         drive: Arc<tuxdrive_drive::DriveClient>,
         cfg: crate::config::Config,
         account_email: Arc<RwLock<String>>,
+        log_buffer: crate::logging::LogBuffer,
     ) -> Self {
         Self {
             sync_engine,
@@ -186,20 +187,11 @@ impl DaemonState {
             cfg,
             account_email,
             paused: RwLock::new(false),
-            log_buffer: RwLock::new(VecDeque::with_capacity(1000)),
+            log_buffer,
             login_state: RwLock::new(LoginState::default()),
             pending_conflict: RwLock::new(None),
             login_task: RwLock::new(None),
         }
-    }
-
-    /// Append a line to the rolling log buffer (capped at 1 000 entries).
-    pub fn push_log(&self, line: String) {
-        let mut buf = self.log_buffer.write();
-        if buf.len() >= 1000 {
-            buf.pop_front();
-        }
-        buf.push_back(line);
     }
 }
 

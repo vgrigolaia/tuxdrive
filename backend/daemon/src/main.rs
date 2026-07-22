@@ -132,7 +132,7 @@ async fn query_status(cfg: &Config) -> anyhow::Result<()> {
 
 async fn run_daemon(cfg: Config) -> anyhow::Result<()> {
     // 1. Initialise logging.
-    logging::init_logging(&cfg.log.level, cfg.log.file.as_deref())?;
+    let log_buffer = logging::init_logging(&cfg.log.level, cfg.log.file.as_deref())?;
     info!("tuxdrive-daemon starting");
 
     // 2. Acquire an exclusive lock file so only one daemon instance runs.
@@ -231,6 +231,7 @@ async fn run_daemon(cfg: Config) -> anyhow::Result<()> {
         Arc::clone(&drive),
         cfg.clone(),
         account_email_cell,
+        log_buffer,
     ));
     let ipc_server = IpcServer::new(cfg.socket_path(), Arc::clone(&daemon_state));
 
